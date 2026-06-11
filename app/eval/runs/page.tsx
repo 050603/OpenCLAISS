@@ -38,7 +38,6 @@ EVAL_USE_MOCK_LLM=true npm run eval:course -- --input examples/eval/sample-cours
           </pre>
           <p>如果你看到 npm ENOENT / Could not read package.json，说明命令是在错误目录运行的，而不是诊断模块本身报错。</p>
         </div>
-        <p>暂无报告。请先运行 npm run eval:course 生成 report。</p>
       ) : (
         <table style={{ borderCollapse: 'collapse', minWidth: 1200 }}>
           <thead>

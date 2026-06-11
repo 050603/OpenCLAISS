@@ -28,7 +28,6 @@ function defaultEvaluation(scene: ParsedScene, isInteraction: boolean): Interact
 
 function applyRules(scene: ParsedScene, evaluation: InteractionEvaluation): InteractionEvaluation {
   const result = { ...evaluation, sceneId: scene.sceneId, isInteraction: hasInteractiveTask(scene) };
-  const result = { ...evaluation, sceneId: scene.sceneId, isInteraction: INTERACTION_TYPES.has(scene.sceneType) };
   if (!result.isInteraction) return result;
   const gameInstructionLength = scene.sceneType === 'game' ? scene.content.length : 0;
   if (!scene.learningObjective.trim()) {
@@ -50,7 +49,6 @@ export async function judgeInteractions(scenes: ParsedScene[]): Promise<Interact
   const results: InteractionEvaluation[] = [];
   for (const scene of scenes) {
     const isInteraction = hasInteractiveTask(scene);
-    const isInteraction = INTERACTION_TYPES.has(scene.sceneType);
     if (!isInteraction) {
       results.push(defaultEvaluation(scene, false));
       continue;

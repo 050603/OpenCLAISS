@@ -47,11 +47,6 @@ function stripCodeFences(text: string): string {
   return text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim();
 }
 
-const EVAL_CACHE_VERSION = 'course-eval-v2';
-
-function cacheKeyFor(schemaName: string, modelName: string, systemPrompt: string, userPrompt: string): string {
-  return createHash('sha256')
-    .update(JSON.stringify({ version: EVAL_CACHE_VERSION, schemaName, modelName, systemPrompt, userPrompt }))
 function cacheKeyFor(schemaName: string, modelName: string, systemPrompt: string, userPrompt: string): string {
   return createHash('sha256')
     .update(JSON.stringify({ schemaName, modelName, systemPrompt, userPrompt }))
@@ -77,7 +72,7 @@ function tryParsePromptObject(userPrompt: string): Record<string, unknown> {
 function getMockResponse(schemaName: string, userPrompt = ''): unknown {
   const promptObject = tryParsePromptObject(userPrompt);
   const promptContent = typeof promptObject.content === 'string' ? promptObject.content : userPrompt;
-function getMockResponse(schemaName: string): unknown {
+
   if (schemaName === 'ParsedScenes') {
     return [
       {
@@ -122,6 +117,7 @@ function getMockResponse(schemaName: string): unknown {
       },
     ];
   }
+
   if (schemaName === 'ExtractedConcepts') {
     const concepts: unknown[] = [];
     const add = (concept: string, difficulty: 'basic' | 'intermediate' | 'advanced', evidence = concept) =>
@@ -144,6 +140,7 @@ function getMockResponse(schemaName: string): unknown {
     if (/大语言模型|LLM/.test(promptContent)) add('大语言模型', 'advanced');
     return concepts;
   }
+
   if (schemaName === 'ScaffoldIssue') {
     const baseline = promptObject.ruleBaseline as Record<string, unknown> | undefined;
     if (baseline?.hasIssue === true) {
@@ -167,29 +164,9 @@ function getMockResponse(schemaName: string): unknown {
       evidence: '',
       reason: 'mock 未发现额外脚手架问题。',
       suggestion: '',
-    return [
-      {
-        sceneId: 'unknown',
-        concept: 'Transformer',
-        difficulty: 'advanced',
-        evidence: 'Transformer',
-        isAdvancedForBeginners: true,
-        confidence: 0.9,
-      },
-    ];
-  }
-  if (schemaName === 'ScaffoldIssue') {
-    return {
-      sceneId: 'unknown',
-      hasIssue: true,
-      severity: 4,
-      issueType: 'advanced_concept_intrusion',
-      problematicConcepts: ['Transformer'],
-      evidence: '出现高级模型术语',
-      reason: '第 1 课面向初学者时展开 Transformer 会产生知识越级。',
-      suggestion: '改为只用生活案例解释 AI 三要素，将 Transformer 放到后续课程。',
     };
   }
+
   if (schemaName === 'InteractionEvaluation') {
     return {
       sceneId: 'unknown',
@@ -205,6 +182,7 @@ function getMockResponse(schemaName: string): unknown {
       suggestion: '让学生拖拽数据、算法、算力到具体 AI 应用案例并解释理由。',
     };
   }
+
   if (schemaName === 'EfficiencyEvaluation') {
     const fillerPhrases = ['太棒了', '非常有趣', '准备好了吗', '让我们一起', '奇妙旅程', '我也很期待', '你真聪明', '别担心', '接下来会很有意思'].filter((phrase) =>
       promptContent.includes(phrase),
@@ -221,19 +199,9 @@ function getMockResponse(schemaName: string): unknown {
       hasEfficiencyProblem: hasProblem,
       reason: hasProblem ? '寒暄和鼓励占比较高。' : 'mock 未发现明显效率问题。',
       suggestion: hasProblem ? '压缩为一句反馈，并补充具体知识反馈。' : '',
-    return {
-      sceneId: 'unknown',
-      estimatedTimeSeconds: 30,
-      redundantUtteranceRatio: 0.6,
-      fillerPhrases: ['太棒了', '你真聪明'],
-      repeatedConcepts: [],
-      lowValueAgentTurns: ['情绪性鼓励未推进学习目标'],
-      efficiencyScore: 45,
-      hasEfficiencyProblem: true,
-      reason: '寒暄和鼓励占比较高。',
-      suggestion: '压缩为一句反馈，并补充具体知识反馈。',
     };
   }
+
   return {};
 }
 
@@ -253,9 +221,6 @@ export async function callLLMJson<T>({
     const cached = JSON.parse(await readFile(cachePath, 'utf8')) as { value: unknown; rawResponse?: string; mock?: boolean };
     const parsed = zodSchema.parse(cached.value);
     traceEvents.push({ schemaName, cacheKey: key, cached: true, mock: cached.mock === true, ok: true, rawResponse: cached.rawResponse, createdAt: new Date().toISOString() });
-    const cached = JSON.parse(await readFile(cachePath, 'utf8')) as { value: unknown; rawResponse?: string };
-    const parsed = zodSchema.parse(cached.value);
-    traceEvents.push({ schemaName, cacheKey: key, cached: true, mock: false, ok: true, rawResponse: cached.rawResponse, createdAt: new Date().toISOString() });
     return parsed;
   } catch {
     // Cache miss or stale invalid cache; continue with mock/API call.
@@ -267,9 +232,6 @@ export async function callLLMJson<T>({
     const value = zodSchema.parse(getMockResponse(schemaName, userPrompt));
     const rawResponse = JSON.stringify(value);
     await writeFile(cachePath, JSON.stringify({ schemaName, modelName, mock: true, value, rawResponse, createdAt: new Date().toISOString() }, null, 2));
-    const value = zodSchema.parse(getMockResponse(schemaName));
-    const rawResponse = JSON.stringify(value);
-    await writeFile(cachePath, JSON.stringify({ schemaName, modelName, value, rawResponse, createdAt: new Date().toISOString() }, null, 2));
     traceEvents.push({ schemaName, cacheKey: key, cached: false, mock: true, ok: true, rawResponse, createdAt: new Date().toISOString() });
     return value;
   }
