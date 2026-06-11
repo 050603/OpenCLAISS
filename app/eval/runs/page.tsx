@@ -1,23 +1,10 @@
-import { readdir, readFile } from 'fs/promises';
 import Link from 'next/link';
 import { existsSync } from 'fs';
 import path from 'path';
-import { CourseDiagnosticReportSchema, type CourseDiagnosticReport } from '@/lib/evaluation/schemas';
+import { loadReports } from '@/lib/evaluation/report-store';
 
 export const dynamic = 'force-dynamic';
 
-async function loadReports(): Promise<CourseDiagnosticReport[]> {
-  const dir = path.join(process.cwd(), process.env.EVAL_REPORT_DIR || 'data/eval/reports');
-  try {
-    const files = (await readdir(dir)).filter((file) => file.endsWith('.json'));
-    const reports = await Promise.all(
-      files.map(async (file) => CourseDiagnosticReportSchema.safeParse(JSON.parse(await readFile(path.join(dir, file), 'utf8')))),
-    );
-    return reports.filter((result) => result.success).map((result) => result.data).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  } catch {
-    return [];
-  }
-}
 
 export default async function EvalRunsPage() {
   const reports = await loadReports();
@@ -26,7 +13,7 @@ export default async function EvalRunsPage() {
   return (
     <main style={{ padding: 24, overflowX: 'auto' }}>
       <h1>课程生成质量诊断报告</h1>
-      <p>读取本地 EVAL_REPORT_DIR 下的 JSON 报告，用于研究评测和 baseline 对比。</p>
+      <p>读取本地 EVAL_REPORT_DIR 下的 JSON 报告，用于研究评测和 baseline 对比。<Link href="/eval/compare">查看横向对比</Link></p>
       {reports.length === 0 ? (
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, background: '#fafafa' }}>
           <p>暂无报告。请先在项目根目录生成 report，然后刷新本页。</p>

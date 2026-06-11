@@ -1,24 +1,20 @@
-import { readFile } from 'fs/promises';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import path from 'path';
-import { CourseDiagnosticReportSchema, type CourseDiagnosticReport } from '@/lib/evaluation/schemas';
+import HumanReviewForm from '@/app/eval/runs/[runId]/HumanReviewForm';
+import { loadReport } from '@/lib/evaluation/report-store';
 
 export const dynamic = 'force-dynamic';
 
 type PageProps = { params: Promise<{ runId: string }> };
 
-async function loadReport(runId: string): Promise<CourseDiagnosticReport | null> {
-  try {
-    const filePath = path.join(process.cwd(), process.env.EVAL_REPORT_DIR || 'data/eval/reports', `${runId}.json`);
-    const parsed = CourseDiagnosticReportSchema.safeParse(JSON.parse(await readFile(filePath, 'utf8')));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
 
 const cardStyle = { border: '1px solid #ddd', borderRadius: 8, padding: 12, marginBottom: 12 };
+
+function humanReviewStatus(issue: { humanReview?: { confirmed?: boolean; reviewer?: string; note?: string; reviewedAt?: string } }) {
+  if (issue.humanReview?.confirmed === true) return '已确认有效';
+  if (issue.humanReview?.confirmed === false) return '已确认无效';
+  return '未确认';
+}
 
 export default async function EvalRunDetailPage({ params }: PageProps) {
   const { runId } = await params;
@@ -30,7 +26,7 @@ export default async function EvalRunDetailPage({ params }: PageProps) {
       <h1>{report.topic}</h1>
       <p>runId: {report.runId}</p>
       <p>学习者: {report.targetLearner} / 第 {report.lessonIndex} 课 / 目标 {report.expectedDurationMinutes} 分钟 / 估算 {report.estimatedDurationMinutes} 分钟</p>
-      <p><a href={`/api/eval/reports/${report.runId}`} download>下载 JSON 报告</a></p>
+      <p><a href={`/api/eval/reports/${report.runId}`} download>下载 JSON 报告</a> · <Link href="/eval/compare">横向对比</Link></p>
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
         <div style={cardStyle}>脚手架稳定性<br /><strong>{report.scaffoldStabilityScore}</strong></div>
         <div style={cardStyle}>互动有效性<br /><strong>{report.interactionEffectivenessScore}</strong></div>
@@ -49,6 +45,19 @@ export default async function EvalRunDetailPage({ params }: PageProps) {
             <p><strong>证据：</strong>{issue.evidence || '该项评估失败或无证据。'}</p>
             <p><strong>原因：</strong>{issue.reason || '该项评估失败。'}</p>
             <p><strong>建议：</strong>{issue.suggestion || '暂无建议。'}</p>
+            <div style={{ background: '#f7f7f7', padding: 12, borderRadius: 6 }}>
+              <p><strong>人工确认：</strong>{humanReviewStatus(issue)}</p>
+              {issue.humanReview?.reviewer ? <p><strong>reviewer：</strong>{issue.humanReview.reviewer}</p> : null}
+              {issue.humanReview?.note ? <p><strong>note：</strong>{issue.humanReview.note}</p> : null}
+              {issue.humanReview?.reviewedAt ? <p><strong>reviewedAt：</strong>{issue.humanReview.reviewedAt}</p> : null}
+              <HumanReviewForm
+                runId={report.runId}
+                issueId={issue.id}
+                initialConfirmed={issue.humanReview?.confirmed}
+                initialReviewer={issue.humanReview?.reviewer}
+                initialNote={issue.humanReview?.note}
+              />
+            </div>
           </article>
         ))}
       </section>

@@ -106,6 +106,7 @@ export async function generateReport(params: {
     targetLearner: input.targetLearner,
     lessonIndex: input.lessonIndex,
     expectedDurationMinutes: input.expectedDurationMinutes,
+    sourceSystem: input.sourceSystem,
     estimatedDurationMinutes,
     scaffoldStabilityScore,
     interactionEffectivenessScore,

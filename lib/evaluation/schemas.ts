@@ -126,6 +126,7 @@ export const CourseDiagnosticReportSchema = z.object({
   targetLearner: z.string().min(1),
   lessonIndex: z.number().int().positive(),
   expectedDurationMinutes: z.number().positive(),
+  sourceSystem: z.string().min(1).default('unknown'),
   estimatedDurationMinutes: z.number().nonnegative(),
   scaffoldStabilityScore: z.number().min(0).max(100),
   interactionEffectivenessScore: z.number().min(0).max(100),
