@@ -2,6 +2,13 @@ import { callLLMJson } from '@/lib/evaluation/llm-client';
 import { InteractionEvaluationSchema, type InteractionEvaluation, type ParsedScene } from '@/lib/evaluation/schemas';
 
 const INTERACTION_TYPES = new Set(['interaction', 'game', 'quiz', 'agent_dialogue']);
+const INTERACTIVE_TASK_RE = /请|回答|选择|拖拽|完成|讨论|模拟|操作|任务|挑战|测验|问题|quiz/i;
+
+function hasInteractiveTask(scene: ParsedScene): boolean {
+  if (!INTERACTION_TYPES.has(scene.sceneType)) return false;
+  if (scene.sceneType === 'agent_dialogue') return INTERACTIVE_TASK_RE.test(scene.content);
+  return true;
+}
 
 function defaultEvaluation(scene: ParsedScene, isInteraction: boolean): InteractionEvaluation {
   return {
@@ -20,6 +27,7 @@ function defaultEvaluation(scene: ParsedScene, isInteraction: boolean): Interact
 }
 
 function applyRules(scene: ParsedScene, evaluation: InteractionEvaluation): InteractionEvaluation {
+  const result = { ...evaluation, sceneId: scene.sceneId, isInteraction: hasInteractiveTask(scene) };
   const result = { ...evaluation, sceneId: scene.sceneId, isInteraction: INTERACTION_TYPES.has(scene.sceneType) };
   if (!result.isInteraction) return result;
   const gameInstructionLength = scene.sceneType === 'game' ? scene.content.length : 0;
@@ -41,6 +49,7 @@ function applyRules(scene: ParsedScene, evaluation: InteractionEvaluation): Inte
 export async function judgeInteractions(scenes: ParsedScene[]): Promise<InteractionEvaluation[]> {
   const results: InteractionEvaluation[] = [];
   for (const scene of scenes) {
+    const isInteraction = hasInteractiveTask(scene);
     const isInteraction = INTERACTION_TYPES.has(scene.sceneType);
     if (!isInteraction) {
       results.push(defaultEvaluation(scene, false));

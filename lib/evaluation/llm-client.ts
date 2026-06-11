@@ -47,6 +47,11 @@ function stripCodeFences(text: string): string {
   return text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim();
 }
 
+const EVAL_CACHE_VERSION = 'course-eval-v2';
+
+function cacheKeyFor(schemaName: string, modelName: string, systemPrompt: string, userPrompt: string): string {
+  return createHash('sha256')
+    .update(JSON.stringify({ version: EVAL_CACHE_VERSION, schemaName, modelName, systemPrompt, userPrompt }))
 function cacheKeyFor(schemaName: string, modelName: string, systemPrompt: string, userPrompt: string): string {
   return createHash('sha256')
     .update(JSON.stringify({ schemaName, modelName, systemPrompt, userPrompt }))
@@ -60,6 +65,18 @@ function sanitizeError(error: unknown): string {
   return message;
 }
 
+function tryParsePromptObject(userPrompt: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(userPrompt) as Record<string, unknown>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getMockResponse(schemaName: string, userPrompt = ''): unknown {
+  const promptObject = tryParsePromptObject(userPrompt);
+  const promptContent = typeof promptObject.content === 'string' ? promptObject.content : userPrompt;
 function getMockResponse(schemaName: string): unknown {
   if (schemaName === 'ParsedScenes') {
     return [
@@ -106,6 +123,50 @@ function getMockResponse(schemaName: string): unknown {
     ];
   }
   if (schemaName === 'ExtractedConcepts') {
+    const concepts: unknown[] = [];
+    const add = (concept: string, difficulty: 'basic' | 'intermediate' | 'advanced', evidence = concept) =>
+      concepts.push({
+        sceneId: 'unknown',
+        concept,
+        difficulty,
+        evidence,
+        isAdvancedForBeginners: difficulty !== 'basic',
+        confidence: 0.9,
+      });
+    if (/人工智能|AI/.test(promptContent)) add('人工智能', 'basic');
+    if (/数据/.test(promptContent)) add('数据', 'basic');
+    if (/算法/.test(promptContent)) add('算法', 'basic');
+    if (/算力/.test(promptContent)) add('算力', 'basic');
+    if (/Transformer/i.test(promptContent)) add('Transformer', 'advanced');
+    if (/多头注意力/.test(promptContent)) add('多头注意力', 'advanced');
+    if (/反向传播/.test(promptContent)) add('反向传播', 'advanced');
+    if (/梯度下降/.test(promptContent)) add('梯度下降', 'advanced');
+    if (/大语言模型|LLM/.test(promptContent)) add('大语言模型', 'advanced');
+    return concepts;
+  }
+  if (schemaName === 'ScaffoldIssue') {
+    const baseline = promptObject.ruleBaseline as Record<string, unknown> | undefined;
+    if (baseline?.hasIssue === true) {
+      return {
+        sceneId: typeof baseline.sceneId === 'string' ? baseline.sceneId : 'unknown',
+        hasIssue: true,
+        severity: typeof baseline.severity === 'number' ? baseline.severity : 4,
+        issueType: typeof baseline.issueType === 'string' ? baseline.issueType : 'advanced_concept_intrusion',
+        problematicConcepts: Array.isArray(baseline.problematicConcepts) ? baseline.problematicConcepts : ['Transformer'],
+        evidence: typeof baseline.evidence === 'string' ? baseline.evidence : '出现高级模型术语',
+        reason: '第 1 课面向初学者时展开高级模型机制会产生知识越级。',
+        suggestion: '改为只用生活案例解释 AI 三要素，将高级模型机制放到后续课程。',
+      };
+    }
+    return {
+      sceneId: typeof baseline?.sceneId === 'string' ? baseline.sceneId : 'unknown',
+      hasIssue: false,
+      severity: 1,
+      issueType: 'none',
+      problematicConcepts: [],
+      evidence: '',
+      reason: 'mock 未发现额外脚手架问题。',
+      suggestion: '',
     return [
       {
         sceneId: 'unknown',
@@ -145,6 +206,21 @@ function getMockResponse(schemaName: string): unknown {
     };
   }
   if (schemaName === 'EfficiencyEvaluation') {
+    const fillerPhrases = ['太棒了', '非常有趣', '准备好了吗', '让我们一起', '奇妙旅程', '我也很期待', '你真聪明', '别担心', '接下来会很有意思'].filter((phrase) =>
+      promptContent.includes(phrase),
+    );
+    const hasProblem = fillerPhrases.length >= 2;
+    return {
+      sceneId: 'unknown',
+      estimatedTimeSeconds: 30,
+      redundantUtteranceRatio: hasProblem ? 0.6 : 0.05,
+      fillerPhrases,
+      repeatedConcepts: [],
+      lowValueAgentTurns: hasProblem ? ['情绪性鼓励未推进学习目标'] : [],
+      efficiencyScore: hasProblem ? 45 : 90,
+      hasEfficiencyProblem: hasProblem,
+      reason: hasProblem ? '寒暄和鼓励占比较高。' : 'mock 未发现明显效率问题。',
+      suggestion: hasProblem ? '压缩为一句反馈，并补充具体知识反馈。' : '',
     return {
       sceneId: 'unknown',
       estimatedTimeSeconds: 30,
@@ -174,6 +250,9 @@ export async function callLLMJson<T>({
   const useMock = process.env.EVAL_USE_MOCK_LLM === 'true' || !process.env.LLM_API_KEY;
 
   try {
+    const cached = JSON.parse(await readFile(cachePath, 'utf8')) as { value: unknown; rawResponse?: string; mock?: boolean };
+    const parsed = zodSchema.parse(cached.value);
+    traceEvents.push({ schemaName, cacheKey: key, cached: true, mock: cached.mock === true, ok: true, rawResponse: cached.rawResponse, createdAt: new Date().toISOString() });
     const cached = JSON.parse(await readFile(cachePath, 'utf8')) as { value: unknown; rawResponse?: string };
     const parsed = zodSchema.parse(cached.value);
     traceEvents.push({ schemaName, cacheKey: key, cached: true, mock: false, ok: true, rawResponse: cached.rawResponse, createdAt: new Date().toISOString() });
@@ -185,6 +264,9 @@ export async function callLLMJson<T>({
   await mkdir(path.dirname(cachePath), { recursive: true });
 
   if (useMock) {
+    const value = zodSchema.parse(getMockResponse(schemaName, userPrompt));
+    const rawResponse = JSON.stringify(value);
+    await writeFile(cachePath, JSON.stringify({ schemaName, modelName, mock: true, value, rawResponse, createdAt: new Date().toISOString() }, null, 2));
     const value = zodSchema.parse(getMockResponse(schemaName));
     const rawResponse = JSON.stringify(value);
     await writeFile(cachePath, JSON.stringify({ schemaName, modelName, value, rawResponse, createdAt: new Date().toISOString() }, null, 2));

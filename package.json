@@ -23,6 +23,9 @@
     "eval:outline-language": "tsx eval/outline-language/runner.ts",
     "eval:orchestration": "tsx eval/orchestration/runner.ts",
     "eval:orchestration:answering": "tsx eval/orchestration/answering-runner.ts",
+    "eval:course": "tsx scripts/evaluate-course.ts",
+    "eval:course:mock": "EVAL_USE_MOCK_LLM=true tsx scripts/evaluate-course.ts",
+    "eval:course:sample": "EVAL_USE_MOCK_LLM=true tsx scripts/evaluate-course.ts --input examples/eval/sample-course.txt --topic 人工智能的三大基石 --targetLearner 大学一年级非计算机专业学生 --lessonIndex 1 --expectedDurationMinutes 10 --sourceSystem OpenMAIC"
     "eval:course": "tsx scripts/evaluate-course.ts"
   },
   "dependencies": {
