@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -23,6 +24,7 @@ import {
   Atom,
   X,
   Presentation,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -455,6 +457,18 @@ function HomePage() {
             </div>
           )}
         </div>
+
+        <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-700" />
+
+        {/* Evaluation Reports Button */}
+        <Link
+          href="/eval/runs"
+          title="课程诊断报告"
+          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-xs font-medium text-violet-600 dark:text-violet-300 hover:bg-white dark:hover:bg-gray-700 hover:text-violet-700 dark:hover:text-violet-200 hover:shadow-sm transition-all"
+        >
+          <ClipboardCheck className="w-4 h-4" />
+          <span className="hidden sm:inline">诊断报告</span>
+        </Link>
 
         <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-700" />
 
