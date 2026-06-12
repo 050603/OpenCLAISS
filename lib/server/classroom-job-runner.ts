@@ -1,4 +1,6 @@
 import { createLogger } from '@/lib/logger';
+import { evaluateCourse } from '@/lib/evaluation/evaluate-course';
+import { createCourseGenerationInputFromOpenMAICResult } from '@/lib/evaluation/openmaic-adapter';
 import { generateClassroom, type GenerateClassroomInput } from '@/lib/server/classroom-generation';
 import {
   markClassroomGenerationJobFailed,
@@ -32,6 +34,18 @@ export function runClassroomGenerationJob(
       });
 
       await markClassroomGenerationJobSucceeded(jobId, result);
+
+      if (process.env.EVAL_AUTO_RUN_AFTER_GENERATION === 'true') {
+        void evaluateCourse(
+          createCourseGenerationInputFromOpenMAICResult({
+            jobId,
+            requirement: input.requirement,
+            result,
+          }),
+        ).catch((evalError) => {
+          log.error(`Course evaluator failed for generation job ${jobId}:`, evalError);
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       log.error(`Classroom generation job ${jobId} failed:`, error);

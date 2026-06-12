@@ -25,6 +25,7 @@ export interface ClassroomGenerationJob {
   startedAt?: string;
   completedAt?: string;
   inputSummary: {
+    requirement: string;
     requirementPreview: string;
     hasPdf: boolean;
     pdfTextLength: number;
@@ -46,6 +47,7 @@ function jobFilePath(jobId: string) {
 
 function buildInputSummary(input: GenerateClassroomInput): ClassroomGenerationJob['inputSummary'] {
   return {
+    requirement: input.requirement,
     requirementPreview:
       input.requirement.length > 200 ? `${input.requirement.slice(0, 197)}...` : input.requirement,
     hasPdf: !!input.pdfContent,
