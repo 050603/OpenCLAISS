@@ -156,10 +156,14 @@ async function generateSingleMedia(
     if (abortSignal?.aborted) return;
     const message = err instanceof Error ? err.message : String(err);
     const errorCode = err instanceof MediaApiError ? err.errorCode : undefined;
-    log.error(`Failed ${req.elementId}:`, message);
+    // Media generation is best-effort and must not surface as a Next.js dev overlay.
+    // Use warn instead of error so transient provider/CDN/proxy failures do not
+    // interrupt interactive lesson generation. The task state still records the
+    // failure and the UI exposes retry where appropriate.
+    log.warn(`Failed ${req.elementId}:`, message);
     useMediaGenerationStore.getState().markFailed(req.elementId, message, errorCode);
 
-    // Persist non-retryable failures to IndexedDB so they survive page refresh
+    // Persist structured failures to IndexedDB so they survive page refresh
     if (errorCode) {
       await db.mediaFiles
         .put({
@@ -268,14 +272,25 @@ async function fetchAsBlob(url: string): Promise<Blob> {
   }
   // For remote URLs, proxy through our server to bypass CORS restrictions
   if (url.startsWith('http://') || url.startsWith('https://')) {
-    const res = await fetch('/api/proxy-media', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-    });
+    let res: Response;
+    try {
+      res = await fetch('/api/proxy-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+    } catch (error) {
+      throw new MediaApiError(
+        `Media proxy request failed: ${error instanceof Error ? error.message : String(error)}`,
+        'MEDIA_FETCH_FAILED',
+      );
+    }
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `Proxy fetch failed: ${res.status}`);
+      const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+      throw new MediaApiError(
+        data.error || `Proxy fetch failed: ${res.status}`,
+        data.code || 'MEDIA_FETCH_FAILED',
+      );
     }
     return res.blob();
   }

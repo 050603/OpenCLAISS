@@ -714,3 +714,83 @@ If you find OpenMAIC useful in your research, please consider citing:
 ## 📄 License
 
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+---
+
+## Course Evaluation Research Module
+
+This research fork adds a non-intrusive evaluator for OpenMAIC-generated AI-literacy courses. It does **not** rewrite the classroom generation pipeline. Reports are stored as local JSON files and can be inspected from `/eval/runs` and `/eval/compare`.
+
+### Environment variables
+
+Copy `.env.example` to `.env.local` and configure the evaluator section when needed:
+
+```env
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_API_KEY=your-key-here
+LLM_MODEL_NAME=deepseek-v4-flash
+LLM_JSON_MODE=true
+LLM_TIMEOUT_MS=60000
+LLM_MAX_RETRIES=2
+EVAL_STORAGE_MODE=json
+EVAL_TRACE_DIR=data/eval/traces
+EVAL_REPORT_DIR=data/eval/reports
+EVAL_CACHE_DIR=data/eval/cache
+EVAL_USE_MOCK_LLM=false
+EVAL_AUTO_RUN_AFTER_GENERATION=false
+EVAL_DEFAULT_TARGET_LEARNER=大学一年级非计算机专业学生
+EVAL_DEFAULT_EXPECTED_DURATION_MINUTES=10
+EVAL_DEFAULT_LESSON_INDEX=1
+```
+
+Never commit real API keys. Use `EVAL_USE_MOCK_LLM=true` to run the full evaluator without a real LLM.
+
+### Run a mock diagnostic
+
+Run commands from the repository root, i.e. the directory containing `package.json`:
+
+```bash
+pnpm run eval:course:sample
+```
+
+Equivalent explicit command:
+
+```bash
+EVAL_USE_MOCK_LLM=true pnpm run eval:course -- \
+  --input examples/eval/sample-course.txt \
+  --topic "人工智能的三大基石" \
+  --targetLearner "大学一年级非计算机专业学生" \
+  --lessonIndex 1 \
+  --expectedDurationMinutes 10 \
+  --sourceSystem "OpenMAIC"
+```
+
+If npm/pnpm reports `Could not read package.json`, first `cd` into the OpenMAIC repository root.
+
+### Web UI and APIs
+
+- `/eval/runs`: report list.
+- `/eval/runs/[runId]`: report details and human issue review.
+- `/eval/compare`: aggregate comparison across reports.
+- `GET /api/eval/reports/[runId]`: download report JSON.
+- `GET /api/eval/reports/export`: export all reports as CSV.
+- `PATCH /api/eval/reports/[runId]/issues/[issueId]/review`: save human review for an issue.
+- `POST /api/eval/classroom-jobs/[jobId]`: manually evaluate a completed classroom generation job.
+
+### Optional automatic evaluation after generation
+
+Automatic post-generation evaluation is disabled by default. Enable it explicitly:
+
+```env
+EVAL_AUTO_RUN_AFTER_GENERATION=true
+```
+
+When enabled, evaluator failures are logged but do not change the classroom generation job success state.
+
+### Output locations
+
+```text
+data/eval/reports/{runId}.json
+data/eval/traces/{runId}.json
+data/eval/cache/{hash}.json
+```

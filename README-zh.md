@@ -712,3 +712,37 @@ OpenMAIC/
 ## 📄 许可证
 
 本项目基于 [GNU Affero General Public License v3.0](LICENSE) 开源。
+
+---
+
+## 课程生成质量诊断研究模块
+
+本研究分支新增了非侵入式 evaluator，用于诊断 OpenMAIC 生成的 AI 通识课程。它不会重写原有课堂生成流程，报告以本地 JSON 保存，可通过 `/eval/runs` 和 `/eval/compare` 查看。
+
+### 快速运行 mock 诊断
+
+请在包含 `package.json` 的仓库根目录运行：
+
+```bash
+pnpm run eval:course:sample
+```
+
+如果遇到 `Could not read package.json`，说明当前终端目录不是仓库根目录，请先 `cd` 到 OpenMAIC 项目目录。
+
+### 常用页面与 API
+
+- `/eval/runs`：报告列表。
+- `/eval/runs/[runId]`：报告详情与人工确认。
+- `/eval/compare`：横向聚合对比。
+- `GET /api/eval/reports/export`：导出 CSV。
+- `POST /api/eval/classroom-jobs/[jobId]`：手动评测已完成的课堂生成 job。
+
+### 自动诊断开关
+
+默认不自动运行。如需课堂生成成功后自动诊断，在 `.env.local` 中设置：
+
+```env
+EVAL_AUTO_RUN_AFTER_GENERATION=true
+```
+
+自动诊断失败只记录日志，不会影响原课堂生成成功状态。

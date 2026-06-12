@@ -83,7 +83,10 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    log.error(`Proxy media failed [url="${url?.substring(0, 100) ?? 'unknown'}"]:`, error);
-    return apiError('INTERNAL_ERROR', 500, error instanceof Error ? error.message : String(error));
+    // Remote media URLs returned by providers/CDNs can expire or be temporarily
+    // unreachable. This is a recoverable media-task failure, not an application
+    // crash, so log as a warning to avoid noisy dev overlays.
+    log.warn(`Proxy media failed [url="${url?.substring(0, 100) ?? 'unknown'}"]:`, error);
+    return apiError('UPSTREAM_ERROR', 502, error instanceof Error ? error.message : String(error));
   }
 }
